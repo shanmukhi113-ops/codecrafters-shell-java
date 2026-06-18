@@ -17,6 +17,7 @@ public class Main {
             String redirectFile = null;
             String redirectErrFile = null;
             boolean appendOut = false;
+            boolean appendErr = false;
             List<String> tokens = new ArrayList<>();
             
             for (int i = 0; i < rawTokens.size(); i++) {
@@ -36,6 +37,13 @@ public class Main {
                 } else if (token.equals("2>")) {
                     if (i + 1 < rawTokens.size()) {
                         redirectErrFile = rawTokens.get(i + 1);
+                        appendErr = false;
+                        break;
+                    }
+                } else if (token.equals("2>>")) {
+                    if (i + 1 < rawTokens.size()) {
+                        redirectErrFile = rawTokens.get(i + 1);
+                        appendErr = true;
                         break;
                     }
                 } else {
@@ -75,7 +83,7 @@ public class Main {
                     if (parent != null && !parent.exists()) {
                         parent.mkdirs();
                     }
-                    fosErr = new FileOutputStream(errFile);
+                    fosErr = new FileOutputStream(errFile, appendErr);
                     psErr = new PrintStream(fosErr);
                     System.setErr(psErr);
                 } catch (Exception e) {
@@ -169,7 +177,12 @@ public class Main {
                             }
                             
                             if (redirectErrFile != null) {
-                                pb.redirectError(new File(redirectErrFile));
+                                File fErr = new File(redirectErrFile);
+                                if (appendErr) {
+                                    pb.redirectError(ProcessBuilder.Redirect.appendTo(fErr));
+                                } else {
+                                    pb.redirectError(fErr);
+                                }
                             } else {
                                 pb.redirectError(ProcessBuilder.Redirect.INHERIT);
                             }
