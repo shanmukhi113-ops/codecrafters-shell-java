@@ -9,6 +9,11 @@ public class Main {
             System.out.flush();
             
             String input = scanner.nextLine();
+            
+            if (input.equals("exit")) {
+                break;
+            }
+            
             System.out.println(input + ": command not found");
         }
     }
