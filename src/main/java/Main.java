@@ -24,6 +24,19 @@ public class Main {
                 System.out.println(currentDirectory);
             } else if (command.equals("cd")) {
                 String path = rest.trim();
+                String originalPath = path;
+                
+                String homeDir = System.getenv("HOME");
+                if (homeDir == null) {
+                    homeDir = System.getProperty("user.home");
+                }
+                
+                if (path.equals("~")) {
+                    path = homeDir;
+                } else if (path.startsWith("~/")) {
+                    path = homeDir + path.substring(1);
+                }
+                
                 File dir;
                 
                 if (new File(path).isAbsolute()) {
@@ -35,7 +48,7 @@ public class Main {
                 if (dir.exists() && dir.isDirectory()) {
                     currentDirectory = dir.getCanonicalPath();
                 } else {
-                    System.out.println("cd: " + path + ": No such file or directory");
+                    System.out.println("cd: " + originalPath + ": No such file or directory");
                 }
             } else if (command.equals("type")) {
                 String[] typeParts = rest.trim().split(" +");
