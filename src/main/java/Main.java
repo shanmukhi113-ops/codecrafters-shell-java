@@ -18,10 +18,12 @@ public class Main {
                 break;
             } else if (command.equals("echo")) {
                 System.out.println(rest);
+            } else if (command.equals("pwd")) {
+                System.out.println(System.getProperty("user.dir"));
             } else if (command.equals("type")) {
                 String[] typeParts = rest.trim().split(" +");
                 String typeCommand = typeParts[0];
-                if (typeCommand.equals("echo") || typeCommand.equals("exit") || typeCommand.equals("type")) {
+                if (typeCommand.equals("echo") || typeCommand.equals("exit") || typeCommand.equals("type") || typeCommand.equals("pwd")) {
                     System.out.println(typeCommand + " is a shell builtin");
                 } else {
                     String pathEnv = System.getenv("PATH");
