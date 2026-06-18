@@ -15,8 +15,8 @@ public class Main {
             List<String> rawTokens = parseArguments(input);
             if (rawTokens.isEmpty()) continue;
             
-            // Check for redirection operators: ">" or "1>"
             String redirectFile = null;
+            String redirectErrFile = null;
             List<String> tokens = new ArrayList<>();
             
             for (int i = 0; i < rawTokens.size(); i++) {
@@ -24,7 +24,11 @@ public class Main {
                 if (token.equals(">") || token.equals("1>")) {
                     if (i + 1 < rawTokens.size()) {
                         redirectFile = rawTokens.get(i + 1);
-                        // Skip the operator and the filename, anything after is ignored for the command
+                        break;
+                    }
+                } else if (token.equals("2>")) {
+                    if (i + 1 < rawTokens.size()) {
+                        redirectErrFile = rawTokens.get(i + 1);
                         break;
                     }
                 } else {
@@ -35,10 +39,12 @@ public class Main {
             if (tokens.isEmpty()) continue;
             String command = tokens.get(0);
             
-            // Save standard out
             PrintStream originalOut = System.out;
-            FileOutputStream fos = null;
-            PrintStream ps = null;
+            PrintStream originalErr = System.err;
+            FileOutputStream fosOut = null;
+            PrintStream psOut = null;
+            FileOutputStream fosErr = null;
+            PrintStream psErr = null;
             
             if (redirectFile != null) {
                 try {
@@ -47,12 +53,26 @@ public class Main {
                     if (parent != null && !parent.exists()) {
                         parent.mkdirs();
                     }
-                    fos = new FileOutputStream(outFile);
-                    ps = new PrintStream(fos);
-                    System.setOut(ps);
+                    fosOut = new FileOutputStream(outFile);
+                    psOut = new PrintStream(fosOut);
+                    System.setOut(psOut);
                 } catch (Exception e) {
-                    // If file setup fails, fallback to original output
                     System.setOut(originalOut);
+                }
+            }
+            
+            if (redirectErrFile != null) {
+                try {
+                    File errFile = new File(redirectErrFile);
+                    File parent = errFile.getParentFile();
+                    if (parent != null && !parent.exists()) {
+                        parent.mkdirs();
+                    }
+                    fosErr = new FileOutputStream(errFile);
+                    psErr = new PrintStream(fosErr);
+                    System.setErr(psErr);
+                } catch (Exception e) {
+                    System.setErr(originalErr);
                 }
             }
             
@@ -76,7 +96,7 @@ public class Main {
                     System.out.println(sb.toString());
                 } else if (command.equals("type")) {
                     if (tokens.size() < 2) {
-                        System.out.println("type: missing operand");
+                        System.err.println("type: missing operand");
                     } else {
                         String target = tokens.get(1);
                         if (target.equals("echo") || target.equals("exit") || target.equals("type") || target.equals("pwd") || target.equals("cd")) {
@@ -113,7 +133,6 @@ public class Main {
                             if (dir.exists() && dir.isDirectory()) {
                                 System.setProperty("user.dir", dir.getAbsolutePath());
                             } else {
-                                // cd error goes to standard out for this shell
                                 System.out.println("cd: " + targetDir + ": No such file or directory");
                             }
                         } catch (IOException e) {
@@ -131,32 +150,38 @@ public class Main {
                             }
                             ProcessBuilder pb = new ProcessBuilder(cmdArgs);
                             
-                            // Do not redirect error stream to input stream so stderr goes to terminal
                             if (redirectFile != null) {
                                 pb.redirectOutput(new File(redirectFile));
                             } else {
                                 pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
                             }
-                            pb.redirectError(ProcessBuilder.Redirect.INHERIT);
+                            
+                            if (redirectErrFile != null) {
+                                pb.redirectError(new File(redirectErrFile));
+                            } else {
+                                pb.redirectError(ProcessBuilder.Redirect.INHERIT);
+                            }
                             
                             Process p = pb.start();
                             p.waitFor();
                         } catch (Exception e) {
-                            // Restore output first before printing error
                             System.setOut(originalOut);
-                            System.out.println(command + ": command not found");
+                            System.setErr(originalErr);
+                            System.err.println(command + ": command not found");
                         }
                     } else {
-                        // Restore output first before printing error
                         System.setOut(originalOut);
-                        System.out.println(command + ": command not found");
+                        System.setErr(originalErr);
+                        System.err.println(command + ": command not found");
                     }
                 }
             } finally {
-                // Restore original standard out stream
                 System.setOut(originalOut);
-                if (ps != null) ps.close();
-                if (fos != null) fos.close();
+                System.setErr(originalErr);
+                if (psOut != null) psOut.close();
+                if (fosOut != null) fosOut.close();
+                if (psErr != null) psErr.close();
+                if (fosErr != null) fosErr.close();
             }
         }
     }
