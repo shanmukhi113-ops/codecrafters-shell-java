@@ -127,7 +127,7 @@ public class Main {
                 } else if (c == '\\') {
                     if (i + 1 < input.length()) {
                         char next = input.charAt(i + 1);
-                        if (next == '\\' || next == '"' || next == '$' || next == '\n') {
+                        if (next == '\\' || next == '"' || next == '$' || next == '`') {
                             currentToken.append(next);
                             i++;
                         } else {
