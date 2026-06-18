@@ -11,16 +11,22 @@ public class Main {
             String input = scanner.nextLine().trim();
             if (input.isEmpty()) continue;
             
-            if (input.equals("exit 0")) {
-                System.exit(0);
-            }
-            
             List<String> tokens = parseArguments(input);
             if (tokens.isEmpty()) continue;
             
             String command = tokens.get(0);
             
-            if (command.equals("echo")) {
+            if (command.equals("exit")) {
+                int status = 0;
+                if (tokens.size() > 1) {
+                    try {
+                        status = Integer.parseInt(tokens.get(1));
+                    } catch (NumberFormatException e) {
+                        status = 0;
+                    }
+                }
+                System.exit(status);
+            } else if (command.equals("echo")) {
                 StringBuilder sb = new StringBuilder();
                 for (int i = 1; i < tokens.size(); i++) {
                     sb.append(tokens.get(i));
