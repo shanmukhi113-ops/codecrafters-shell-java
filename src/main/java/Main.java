@@ -1,3 +1,4 @@
+
 import java.util.*;
 import java.io.*;
 
@@ -111,6 +112,7 @@ public class Main {
         StringBuilder currentToken = new StringBuilder();
         boolean inSingleQuotes = false;
         boolean inDoubleQuotes = false;
+        boolean hasChars = false;
         
         for (int i = 0; i < input.length(); i++) {
             char c = input.charAt(i);
@@ -120,6 +122,7 @@ public class Main {
                     inSingleQuotes = false;
                 } else {
                     currentToken.append(c);
+                    hasChars = true;
                 }
             } else if (inDoubleQuotes) {
                 if (c == '"') {
@@ -136,31 +139,38 @@ public class Main {
                     } else {
                         currentToken.append(c);
                     }
+                    hasChars = true;
                 } else {
                     currentToken.append(c);
+                    hasChars = true;
                 }
             } else {
                 if (c == '\'') {
                     inSingleQuotes = true;
+                    hasChars = true;
                 } else if (c == '"') {
                     inDoubleQuotes = true;
+                    hasChars = true;
                 } else if (c == '\\') {
                     if (i + 1 < input.length()) {
                         currentToken.append(input.charAt(i + 1));
                         i++;
                     }
+                    hasChars = true;
                 } else if (Character.isWhitespace(c)) {
-                    if (currentToken.length() > 0) {
+                    if (hasChars) {
                         tokens.add(currentToken.toString());
                         currentToken.setLength(0);
+                        hasChars = false;
                     }
                 } else {
                     currentToken.append(c);
+                    hasChars = true;
                 }
             }
         }
         
-        if (currentToken.length() > 0) {
+        if (hasChars) {
             tokens.add(currentToken.toString());
         }
         
@@ -180,3 +190,4 @@ public class Main {
         return null;
     }
 }
+
