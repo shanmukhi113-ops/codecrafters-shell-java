@@ -15,7 +15,9 @@ public class Main {
         for (int i = 0; i < input.length(); i++) {
             char c = input.charAt(i);
             
-            if (c == '\'' && !inDoubleQuote) {
+            if (c == '\\' && !inSingleQuote && !inDoubleQuote && i + 1 < input.length()) {
+                currentToken.append(input.charAt(++i));
+            } else if (c == '\'' && !inDoubleQuote) {
                 inSingleQuote = !inSingleQuote;
             } else if (c == '"' && !inSingleQuote) {
                 inDoubleQuote = !inDoubleQuote;
