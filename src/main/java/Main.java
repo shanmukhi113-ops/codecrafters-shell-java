@@ -10,15 +10,16 @@ public class Main {
         List<String> tokens = new ArrayList<>();
         StringBuilder currentToken = new StringBuilder();
         boolean inSingleQuote = false;
+        boolean inDoubleQuote = false;
         
         for (int i = 0; i < input.length(); i++) {
             char c = input.charAt(i);
             
-            if (c == '\'' && !inSingleQuote) {
-                inSingleQuote = true;
-            } else if (c == '\'' && inSingleQuote) {
-                inSingleQuote = false;
-            } else if (c == ' ' && !inSingleQuote) {
+            if (c == '\'' && !inDoubleQuote) {
+                inSingleQuote = !inSingleQuote;
+            } else if (c == '"' && !inSingleQuote) {
+                inDoubleQuote = !inDoubleQuote;
+            } else if (c == ' ' && !inSingleQuote && !inDoubleQuote) {
                 if (currentToken.length() > 0) {
                     tokens.add(currentToken.toString());
                     currentToken = new StringBuilder();
