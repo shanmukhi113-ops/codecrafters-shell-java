@@ -24,9 +24,16 @@ public class Main {
                 System.out.println(currentDirectory);
             } else if (command.equals("cd")) {
                 String path = rest.trim();
-                File dir = new File(path);
+                File dir;
+                
+                if (new File(path).isAbsolute()) {
+                    dir = new File(path);
+                } else {
+                    dir = new File(currentDirectory, path);
+                }
+                
                 if (dir.exists() && dir.isDirectory()) {
-                    currentDirectory = dir.getAbsolutePath();
+                    currentDirectory = dir.getCanonicalPath();
                 } else {
                     System.out.println("cd: " + path + ": No such file or directory");
                 }
