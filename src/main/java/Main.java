@@ -1,4 +1,3 @@
-
 import java.util.*;
 import java.io.*;
 
@@ -17,6 +16,7 @@ public class Main {
             
             String redirectFile = null;
             String redirectErrFile = null;
+            boolean appendOut = false;
             List<String> tokens = new ArrayList<>();
             
             for (int i = 0; i < rawTokens.size(); i++) {
@@ -24,6 +24,13 @@ public class Main {
                 if (token.equals(">") || token.equals("1>")) {
                     if (i + 1 < rawTokens.size()) {
                         redirectFile = rawTokens.get(i + 1);
+                        appendOut = false;
+                        break;
+                    }
+                } else if (token.equals(">>") || token.equals("1>>")) {
+                    if (i + 1 < rawTokens.size()) {
+                        redirectFile = rawTokens.get(i + 1);
+                        appendOut = true;
                         break;
                     }
                 } else if (token.equals("2>")) {
@@ -53,7 +60,7 @@ public class Main {
                     if (parent != null && !parent.exists()) {
                         parent.mkdirs();
                     }
-                    fosOut = new FileOutputStream(outFile);
+                    fosOut = new FileOutputStream(outFile, appendOut);
                     psOut = new PrintStream(fosOut);
                     System.setOut(psOut);
                 } catch (Exception e) {
@@ -151,7 +158,12 @@ public class Main {
                             ProcessBuilder pb = new ProcessBuilder(cmdArgs);
                             
                             if (redirectFile != null) {
-                                pb.redirectOutput(new File(redirectFile));
+                                File f = new File(redirectFile);
+                                if (appendOut) {
+                                    pb.redirectOutput(ProcessBuilder.Redirect.appendTo(f));
+                                } else {
+                                    pb.redirectOutput(f);
+                                }
                             } else {
                                 pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
                             }
@@ -269,4 +281,3 @@ public class Main {
         return null;
     }
 }
-
