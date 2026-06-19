@@ -15,14 +15,16 @@ public class Main {
     static class BackgroundJob {
         int id;
         long pid;
-        String command; // raw text as typed, including trailing "&"
+        String command; // raw text as typed, including trailing "&" while Running
         String status;
+        Process process; // reference used to check isAlive() (non-blocking reap)
 
-        BackgroundJob(int id, long pid, String command) {
+        BackgroundJob(int id, long pid, String command, Process process) {
             this.id = id;
             this.pid = pid;
             this.command = command;
             this.status = "Running";
+            this.process = process;
         }
     }
 
@@ -160,21 +162,35 @@ public class Main {
     }
 
     /**
-     * Lists currently-tracked background jobs in bash's `jobs` format:
+     * Lists currently-tracked background jobs in bash's `jobs` format, and
+     * reaps (removes) any job that has finished since the last call:
      *   [1]+  Running                 sleep 10 &
-     * The most recent job gets "+", the second-most-recent gets "-", and
-     * any earlier ones get a blank marker (kept for forward compatibility;
-     * this stage only ever has a single job).
+     *   [1]+  Done                    sleep 10        <- shown once, then removed
+     * Marker: "+" = most recent job, "-" = second most recent, else blank.
      */
     private static void handleJobsCommand(PrintStream out) {
+        // 1. Non-blocking check for jobs that have exited since last call.
+        for (BackgroundJob job : jobsList) {
+            if ("Running".equals(job.status) && job.process != null && !job.process.isAlive()) {
+                job.status = "Done";
+                // "Done" entries drop the trailing '&'
+                if (job.command.endsWith("&")) {
+                    job.command = job.command.substring(0, job.command.length() - 1).trim();
+                }
+            }
+        }
+
+        // 2. Print every tracked job (Running or freshly-Done), in job-number order.
         int n = jobsList.size();
         for (int i = 0; i < n; i++) {
             BackgroundJob job = jobsList.get(i);
-            if (!"Running".equals(job.status)) continue; // only running jobs this stage
             String marker = (i == n - 1) ? "+" : (i == n - 2) ? "-" : " ";
             String paddedStatus = String.format("%-24s", job.status);
             out.println("[" + job.id + "]" + marker + "  " + paddedStatus + job.command);
         }
+
+        // 3. Remove jobs that were shown as Done so they don't print again.
+        jobsList.removeIf(j -> "Done".equals(j.status));
     }
 
     /**
@@ -485,12 +501,9 @@ public class Main {
                         ProcessBuilder pb = new ProcessBuilder(cmdTokens); // bare cmd -> correct argv[0]
                         pb.directory(new File(currentDirectory));
 
-                        // IMPORTANT: inherit IO for BOTH foreground and
-                        // background processes. The only difference between
-                        // the two is whether we block on waitFor() — a
-                        // background job's stdout/stderr/stdin must still go
-                        // straight to the real terminal, not into an
-                        // unread internal Java pipe.
+                        // Inherit IO for BOTH foreground and background
+                        // processes. Background jobs still need stdout/err
+                        // to reach the real terminal (e.g. `cat fifo &`).
                         pb.inheritIO();
 
                         if (rInfo.file != null) {
@@ -508,7 +521,7 @@ public class Main {
                         Process process = pb.start();
 
                         if (background) {
-                            BackgroundJob job = new BackgroundJob(nextJobId, process.pid(), trimmedRaw);
+                            BackgroundJob job = new BackgroundJob(nextJobId, process.pid(), trimmedRaw, process);
                             jobsList.add(job);
                             System.out.println("[" + job.id + "] " + job.pid);
                             nextJobId++;
