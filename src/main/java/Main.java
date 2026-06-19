@@ -10,6 +10,7 @@ import java.util.List;
 
 public class Main {
     static String currentDirectory = System.getProperty("user.dir");
+    static int jobCounter = 0;
 
     static class RedirectionInfo {
         File file = null;
@@ -55,8 +56,6 @@ public class Main {
             } else if (c == '"' && !inSingleQuote) {
                 inDoubleQuote = !inDoubleQuote;
             } else if (c == '|' && !inSingleQuote && !inDoubleQuote) {
-                // Keep "|" as its own standalone token so pipeline splitting works
-                // even when it's jammed against other text (e.g. "wc|head").
                 if (currentToken.length() > 0) {
                     tokens.add(currentToken.toString());
                     currentToken = new StringBuilder();
@@ -94,6 +93,9 @@ public class Main {
             out.println(output.toString());
         } else if (command.equals("pwd")) {
             out.println(currentDirectory);
+        } else if (command.equals("jobs")) {
+            // Empty implementation for this stage: no background jobs are
+            // tracked/listed yet, so this intentionally produces no output.
         } else if (command.equals("cd")) {
             if (tokens.size() < 2) return;
             String path = tokens.get(1);
@@ -138,15 +140,19 @@ public class Main {
                 }
             }
         }
+        // "complete" intentionally left as a no-op builtin for now.
     }
 
     /**
-     * Looks for an executable on disk: returns its absolute path if it exists
-     * and is runnable, or null otherwise. Used only to decide whether a
-     * command can run / print "command not found" — the ProcessBuilder
-     * itself is always given the *original* (bare) command name so argv[0]
-     * stays exactly what the user typed, and Java performs its own PATH
-     * lookup internally when launching.
+     * Checks whether a command exists and is runnable: returns its absolute
+     * path if found, or null otherwise. Used only to decide whether a
+     * command can run / to print "command not found" or for `type`. The
+     * ProcessBuilder is always given the ORIGINAL bare command token so
+     * argv[0] stays exactly what the user typed, and Java performs its own
+     * PATH lookup internally when launching — we never overwrite element 0
+     * with the resolved absolute path, since that disables Java's automatic
+     * PATH search and is what caused "No such file or directory" exec
+     * failures previously.
      */
     private static String findExecutable(String command) {
         if (command.contains("/")) {
@@ -241,8 +247,6 @@ public class Main {
     private static void executePipeline(List<List<String>> stages) throws Exception {
         int n = stages.size();
 
-        // Only the final stage's "> file" / "2> file" redirection is honored,
-        // matching standard shell pipeline semantics.
         RedirectionInfo finalRedir = extractRedirection(stages.get(n - 1));
         stages.set(n - 1, finalRedir.cleanedTokens);
 
@@ -286,14 +290,10 @@ public class Main {
             pb.redirectError(ProcessBuilder.Redirect.INHERIT);
 
             if (i == 0) {
-                // Only the FIRST builder may customize its input.
                 pb.redirectInput(ProcessBuilder.Redirect.INHERIT);
             }
-            // Middle builders: leave input/output at default PIPE — required
-            // by ProcessBuilder.startPipeline's contract.
 
             if (i == n - 1) {
-                // Only the LAST builder may customize its output.
                 if (finalRedir.file != null && !finalRedir.redirectErrorOnly) {
                     pb.redirectOutput(finalRedir.appendOutput
                             ? ProcessBuilder.Redirect.appendTo(finalRedir.file)
@@ -320,9 +320,7 @@ public class Main {
     /**
      * At least one stage is a builtin. Runs stages sequentially, buffering
      * each stage's output fully in memory and feeding it into the next
-     * stage's stdin (or into System.in if the next stage is itself a
-     * builtin). This sacrifices live streaming, which is fine since none of
-     * our builtins (echo/pwd/cd/type) read stdin or produce unbounded output.
+     * stage's stdin (or System.in if the next stage is itself a builtin).
      */
     private static void runMixedPipeline(List<List<String>> stages, RedirectionInfo finalRedir) throws Exception {
         int n = stages.size();
@@ -423,6 +421,15 @@ public class Main {
             if (tokens.isEmpty()) continue;
             if (tokens.get(0).equals("exit")) break;
 
+            // Detect trailing "&" -> run in background (single external
+            // commands only, for now; pipelines ignore this flag).
+            boolean background = false;
+            if (tokens.get(tokens.size() - 1).equals("&")) {
+                background = true;
+                tokens.remove(tokens.size() - 1);
+            }
+            if (tokens.isEmpty()) continue;
+
             List<List<String>> pipelineStages = splitIntoStages(tokens);
 
             if (pipelineStages.size() > 1) {
@@ -472,7 +479,13 @@ public class Main {
                         }
 
                         Process process = pb.start();
-                        process.waitFor();
+
+                        if (background) {
+                            jobCounter++;
+                            System.out.println("[" + jobCounter + "] " + process.pid());
+                        } else {
+                            process.waitFor();
+                        }
                     }
                 }
             }
