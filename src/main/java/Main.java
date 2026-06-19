@@ -10,7 +10,24 @@ import java.util.List;
 
 public class Main {
     static String currentDirectory = System.getProperty("user.dir");
-    static int jobCounter = 0;
+
+    // ---- background job tracking ----
+    static class BackgroundJob {
+        int id;
+        long pid;
+        String command; // raw text as typed, including trailing "&"
+        String status;
+
+        BackgroundJob(int id, long pid, String command) {
+            this.id = id;
+            this.pid = pid;
+            this.command = command;
+            this.status = "Running";
+        }
+    }
+
+    private static final List<BackgroundJob> jobsList = new ArrayList<>();
+    private static int nextJobId = 1;
 
     static class RedirectionInfo {
         File file = null;
@@ -94,8 +111,7 @@ public class Main {
         } else if (command.equals("pwd")) {
             out.println(currentDirectory);
         } else if (command.equals("jobs")) {
-            // Empty implementation for this stage: no background jobs are
-            // tracked/listed yet, so this intentionally produces no output.
+            handleJobsCommand(out);
         } else if (command.equals("cd")) {
             if (tokens.size() < 2) return;
             String path = tokens.get(1);
@@ -144,15 +160,29 @@ public class Main {
     }
 
     /**
+     * Lists currently-tracked background jobs in bash's `jobs` format:
+     *   [1]+  Running                 sleep 10 &
+     * The most recent job gets "+", the second-most-recent gets "-", and
+     * any earlier ones get a blank marker (kept for forward compatibility;
+     * this stage only ever has a single job).
+     */
+    private static void handleJobsCommand(PrintStream out) {
+        int n = jobsList.size();
+        for (int i = 0; i < n; i++) {
+            BackgroundJob job = jobsList.get(i);
+            if (!"Running".equals(job.status)) continue; // only running jobs this stage
+            String marker = (i == n - 1) ? "+" : (i == n - 2) ? "-" : " ";
+            String paddedStatus = String.format("%-24s", job.status);
+            out.println("[" + job.id + "]" + marker + "  " + paddedStatus + job.command);
+        }
+    }
+
+    /**
      * Checks whether a command exists and is runnable: returns its absolute
-     * path if found, or null otherwise. Used only to decide whether a
-     * command can run / to print "command not found" or for `type`. The
-     * ProcessBuilder is always given the ORIGINAL bare command token so
-     * argv[0] stays exactly what the user typed, and Java performs its own
-     * PATH lookup internally when launching — we never overwrite element 0
-     * with the resolved absolute path, since that disables Java's automatic
-     * PATH search and is what caused "No such file or directory" exec
-     * failures previously.
+     * path if found, or null otherwise. Used only for "command not found" /
+     * `type` — the ProcessBuilder is always given the ORIGINAL bare command
+     * token so argv[0] stays exactly what the user typed, and Java performs
+     * its own PATH lookup internally when launching.
      */
     private static String findExecutable(String command) {
         if (command.contains("/")) {
@@ -265,12 +295,6 @@ public class Main {
         }
     }
 
-    /**
-     * All stages are external commands. Uses ProcessBuilder.startPipeline,
-     * which wires every stage together with real OS pipes (kernel-managed,
-     * so it streams correctly for things like `tail -f | head`), and works
-     * for any number of stages without manual pump threads.
-     */
     private static void runExternalPipeline(List<List<String>> stages, RedirectionInfo finalRedir) throws Exception {
         int n = stages.size();
         List<ProcessBuilder> builders = new ArrayList<>();
@@ -285,7 +309,7 @@ public class Main {
                 return;
             }
 
-            ProcessBuilder pb = new ProcessBuilder(tokens); // bare cmd kept -> correct argv[0]
+            ProcessBuilder pb = new ProcessBuilder(tokens);
             pb.directory(new File(currentDirectory));
             pb.redirectError(ProcessBuilder.Redirect.INHERIT);
 
@@ -317,11 +341,6 @@ public class Main {
         }
     }
 
-    /**
-     * At least one stage is a builtin. Runs stages sequentially, buffering
-     * each stage's output fully in memory and feeding it into the next
-     * stage's stdin (or System.in if the next stage is itself a builtin).
-     */
     private static void runMixedPipeline(List<List<String>> stages, RedirectionInfo finalRedir) throws Exception {
         int n = stages.size();
         byte[] inputBytes = null;
@@ -415,8 +434,9 @@ public class Main {
             System.out.flush();
 
             if (!scanner.hasNextLine()) break;
-            String input = scanner.nextLine();
-            List<String> tokens = parseCommand(input);
+            String rawInput = scanner.nextLine();
+            String trimmedRaw = rawInput.trim();
+            List<String> tokens = parseCommand(rawInput);
 
             if (tokens.isEmpty()) continue;
             if (tokens.get(0).equals("exit")) break;
@@ -464,6 +484,13 @@ public class Main {
                     } else {
                         ProcessBuilder pb = new ProcessBuilder(cmdTokens); // bare cmd -> correct argv[0]
                         pb.directory(new File(currentDirectory));
+
+                        // IMPORTANT: inherit IO for BOTH foreground and
+                        // background processes. The only difference between
+                        // the two is whether we block on waitFor() — a
+                        // background job's stdout/stderr/stdin must still go
+                        // straight to the real terminal, not into an
+                        // unread internal Java pipe.
                         pb.inheritIO();
 
                         if (rInfo.file != null) {
@@ -481,8 +508,10 @@ public class Main {
                         Process process = pb.start();
 
                         if (background) {
-                            jobCounter++;
-                            System.out.println("[" + jobCounter + "] " + process.pid());
+                            BackgroundJob job = new BackgroundJob(nextJobId, process.pid(), trimmedRaw);
+                            jobsList.add(job);
+                            System.out.println("[" + job.id + "] " + job.pid);
+                            nextJobId++;
                         } else {
                             process.waitFor();
                         }
