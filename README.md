@@ -1,34 +1,82 @@
 [![progress-banner](https://backend.codecrafters.io/progress/shell/ac9543ec-bcdf-45c3-ad86-cc471127c98f)](https://app.codecrafters.io/users/shanmukhi113-ops?r=2qF)
 
-This is a starting point for Java solutions to the
-["Build Your Own Shell" Challenge](https://app.codecrafters.io/courses/shell/overview).
+# CodeCrafters Shell (Java)
 
-In this challenge, you'll build your own POSIX compliant shell that's capable of
-interpreting shell commands, running external programs and builtin commands like
-cd, pwd, echo and more. Along the way, you'll learn about shell command parsing,
-REPLs, builtin commands, and more.
+A POSIX-style shell built from scratch in Java as part of the CodeCrafters "Build Your Own Shell" challenge.
 
-**Note**: If you're viewing this repo on GitHub, head over to
-[codecrafters.io](https://codecrafters.io) to try the challenge.
+## Features
 
-# Passing the first stage
+* Execute external commands
+* Built-in commands:
 
-The entry point for your `shell` implementation is in `src/main/java/Main.java`.
-Study and uncomment the relevant code, then run the command below to execute the
-tests on our servers:
+  * `echo`
+  * `pwd`
+  * `cd`
+  * `type`
+  * `jobs`
+  * `complete`
+* Command parsing with quote handling
+* Pipelines (`|`)
+* Output redirection (`>`, `>>`)
+* Error redirection (`2>`, `2>>`)
+* Background job execution (`&`)
+* Job control and job listing
+* Job number recycling
+* Shell command completion support
 
-```sh
-codecrafters submit
+## Technologies Used
+
+* Java
+* ProcessBuilder API
+* Linux / POSIX concepts
+* Git & GitHub
+
+## Challenge Progress
+
+✅ Completed all mandatory stages of the CodeCrafters Shell Challenge.
+
+## Architecture
+
+The shell is implemented in Java using:
+
+- Command parsing and tokenization
+- Built-in command handlers
+- ProcessBuilder for external command execution
+- Pipeline management using process streams
+- Background job tracking and lifecycle management
+- Redirection handling for stdout and stderr
+
+## Running the Project
+
+```bash
+mvn package
+./your_program.sh
 ```
 
-Time to move on to the next stage!
+## Example Usage
 
-# Stage 2 & beyond
+```bash
+$ echo Hello
+Hello
 
-Note: This section is for stages 2 and beyond.
+$ pwd
+/home/user
 
-1. Ensure you have `mvn` installed locally
-1. Run `./your_program.sh` to run your program, which is implemented in
-   `src/main/java/Main.java`.
-1. Run `codecrafters submit` to submit your solution to CodeCrafters. Test
-   output will be streamed to your terminal.
+$ sleep 5 &
+[1] 12345
+
+$ jobs
+[1]+ Running sleep 5 &
+```
+
+## What I Learned
+
+* Shell architecture and REPL design
+* Process creation and management
+* Pipes and redirections
+* Background job handling
+* Command parsing and tokenization
+* Unix shell fundamentals
+
+```
+```
