@@ -496,31 +496,23 @@ private static int getNextJobNumber() {
 
     return max + 1;
 }
-    private static void checkAndPrintJobs(PrintStream out, boolean printAll) {
+    private static void checkAndPrintJobs(PrintStream out, boolean printRunningJobs) {
 
     List<JobInfo> completedJobs = new ArrayList<>();
 
-    // Find completed jobs
+    int highest = -1;
+    int secondHighest = -1;
+
     for (JobInfo job : backgroundJobs) {
-        if (!job.process.isAlive()) {
-            completedJobs.add(job);
+        if (job.jobNumber > highest) {
+            secondHighest = highest;
+            highest = job.jobNumber;
+        } else if (job.jobNumber > secondHighest) {
+            secondHighest = job.jobNumber;
         }
     }
 
-    // Print current job table (including newly completed jobs)
     for (JobInfo job : backgroundJobs) {
-
-        int highest = -1;
-        int secondHighest = -1;
-
-        for (JobInfo j : backgroundJobs) {
-            if (j.jobNumber > highest) {
-                secondHighest = highest;
-                highest = j.jobNumber;
-            } else if (j.jobNumber > secondHighest) {
-                secondHighest = j.jobNumber;
-            }
-        }
 
         char marker = ' ';
 
@@ -540,7 +532,9 @@ private static int getNextJobNumber() {
                     displayCommandWithoutTrailingAmpersand(job.command)
             );
 
-        } else if (printAll) {
+            completedJobs.add(job);
+
+        } else if (printRunningJobs) {
 
             out.printf(
                     "[%d]%c  %-24s%s%n",
@@ -552,7 +546,6 @@ private static int getNextJobNumber() {
         }
     }
 
-    // Remove completed jobs AFTER they have been shown once
     backgroundJobs.removeAll(completedJobs);
 }   
 public static void main(String[] args) throws Exception {
@@ -573,15 +566,15 @@ public static void main(String[] args) throws Exception {
                         .getAbsoluteFile();
 
         while (true) {
-            try {
-                Thread.sleep(50);
-            } catch (InterruptedException ignored) {
-            }
+    try {
+        Thread.sleep(50);
+    } catch (InterruptedException ignored) {
+    }
 
-            
+    checkAndPrintJobs(System.out, false);
 
-            System.out.print("$ ");
-            System.out.flush();
+    System.out.print("$ ");
+    System.out.flush();
 
             String cmd = sc.nextLine();
 
