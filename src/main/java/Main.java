@@ -812,8 +812,11 @@ public static void main(String[] args) throws Exception {
                     Process process = pb.start();
 
                     if (background) {
-                        String commandStr = String.join(" ", parts) + " &";
-                        int jobNo = getNextJobNumber();
+
+    checkAndPrintJobs(System.out, false);
+
+    String commandStr = String.join(" ", parts) + " &";
+    int jobNo = getNextJobNumber();
 
                         JobInfo job = new JobInfo(
                                 jobNo,
